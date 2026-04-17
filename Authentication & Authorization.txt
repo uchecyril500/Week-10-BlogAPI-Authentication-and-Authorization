@@ -1,0 +1,648 @@
+article.controller.js;
+-------------------------
+
+const Joi = require("joi");
+const ArticleModel = require("../models/article.model");
+
+// =========================
+// UPDATED VALIDATION SCHEMAS
+// =========================
+const createArticleSchema = Joi.object({
+  header: Joi.string().min(5).required(),
+  subHeader: Joi.string().min(5).optional(),
+  title: Joi.string().min(5).required(),
+  content: Joi.string().min(20).required(),
+  //author: Joi.string().allow("").optional(),
+});
+
+const updateArticleSchema = Joi.object({
+  header: Joi.string().min(5).optional(),
+  subHeader: Joi.string().min(5).optional(),
+  title: Joi.string().min(5).optional(),
+  content: Joi.string().min(20).optional(),
+  //author: Joi.string().allow("").optional(),
+}).min(1);
+
+
+
+// =========================
+// CREATE ARTICLE
+// =========================
+const postArticle = async (req, res, next) => {
+  const { error, value } = createArticleSchema.validate(req.body);
+
+  if (error) {
+    return res.status(400).json(error.details[0].message);
+  }
+
+  // If author is missing or empty, set default
+  if (!value.author || value.author.trim() === "") {
+    value.author = "Guest";
+  }
+
+  try {
+    const newArticle = new ArticleModel(value)({
+
+      title: req.body.title,
+      content: req.body.content,
+      author: req.user.user._id
+    });
+
+    await newArticle.save();
+
+    return res.status(201).json({
+      message: "Article created successfully",
+      data: newArticle,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+// =========================
+// GET ALL ARTICLES (with pagination)
+// =========================
+const getAllArticle = async (req, res, next) => {
+  let limit = Number(req.query.limit);
+  let page = Number(req.query.page);
+
+  if (!limit || limit < 1) limit = 10;
+  if (!page || page < 1) page = 1;
+
+  const skip = (page - 1) * limit;
+
+  try {
+    console.log(req.user);
+
+  
+    const articles = await ArticleModel.find().populate("author", "name_id email")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip(skip);
+
+    return res.status(200).json({
+      message: "Articles fetched successfully",
+      page,
+      limit,
+      data: articles,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+// =========================
+// GET ARTICLE BY ID
+// =========================
+const getArticleById = async (req, res, next) => {
+  try {
+    const article = await ArticleModel.findById(req.params.id);
+
+    if (!article) {
+      return res.status(404).json({
+        message: `Article with ID ${req.params.id} not found`,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Article found",
+      data: article,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+// =========================
+// UPDATE ARTICLE BY ID
+// =========================
+const updateArticleById = async (req, res, next) => {
+  const { error, value } = updateArticleSchema.validate(req.body);
+
+  if (error) {
+    return res.status(400).json(error.details[0].message);
+  }
+
+    // Apply default author BEFORE updating
+      if (value.author === "") {
+        value.author = "Guest";
+    }
+
+    try {
+
+    const updatedArticle = await ArticleModel.findByIdAndUpdate(
+      req.params.id,
+      value,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedArticle) {
+      return res.status(404).json({
+        message: `Article with ID ${req.params.id} not found`,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Article updated successfully",
+      data: updatedArticle,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+// =========================
+// DELETE ARTICLE BY ID
+// =========================
+const deleteArticleById = async (req, res, next) => {
+  try {
+    const article = await ArticleModel.findByIdAndDelete(req.params.id);
+
+    if (!article) {
+      return res.status(404).json({
+        message: `Article with ID ${req.params.id} not found`,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Article deleted successfully",
+      deleted: article
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+
+// =========================
+// SEARCH ARTICLES BY KEYWORD
+// =========================
+const searchArticles = async (req, res, next) => {
+  const { q } = req.query;
+
+  if (!q || q.trim() === "") {
+    return res.status(400).json({ message: "Search query 'q' is required" });
+  }
+
+  try {
+    const results = await ArticleModel.find(
+      { $text: { $search: q } },
+      { score: { $meta: "textScore" } }
+    ).sort({ score: { $meta: "textScore" } });
+
+    return res.status(200).json({
+      message: "Search results",
+      query: q,
+      count: results.length,
+      data: results,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+// =========================
+// EXPORT CONTROLLER
+// =========================
+module.exports = {
+  postArticle,
+  getAllArticle,
+  getArticleById,
+  updateArticleById,
+  deleteArticleById,
+  searchArticles,
+};
+
+
+user.controller.js;
+---------------------
+
+const UserModel = require ("../models/user.model")
+const Joi = require("joi")
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+const logRequest = require("../Middlewares/logger");
+
+const registerUser = async (req, res, next) => {
+
+try {
+  // Add your code here
+
+            const registerSchema = Joi.object({
+            name: Joi.string().min(2).required(),
+            email: Joi.string().email().required(),
+            password: Joi.string().required()
+        });
+
+        const { error } = registerSchema.validate(req.body);
+            if (error)
+                return res.status(400).json({message: error.details[0].message});
+
+    const {email, password, name} = req.body
+
+    const existingUser = await UserModel.findOne({email:email})
+
+    if(existingUser){
+        return res.status(400).json({message: "User already exist"})
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const hashed = await bcrypt.hash(password, salt) ;
+
+    const user = new UserModel({
+        email: email,
+        password: hashed,
+        name: name
+})
+    await user.save()
+    return res.status(200).json({
+
+        message : " User registerd Successfully"
+    })
+
+} catch (error) {
+    
+  next(error);
+}
+
+};
+
+
+
+const loginUser = async (req, res, next) => {
+
+     const loginSchema = Joi.object({
+            
+            email: Joi.string().email().required(),
+            password: Joi.string().required()
+        });
+
+    const { error } = loginSchema.validate(req.body);
+        if (error)
+            return res.status(400).json({message: error.details[0].message});
+
+
+  try{
+
+        const{email, password} = req.body
+
+    const user = await UserModel.findOne({email: email})
+
+    if (!user)
+        return res.status(400).json({message: "User does not exist"})
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) throw new Error("Invalid credentials")
+    
+        const token = jwt.sign(
+          {userId: user._id, name: user.name},
+          process.env.JWT_SECRET, //secret  
+          {expiresIn: '7d'} //options
+
+        );
+
+        const resUser = {
+            _id: user._id,
+            email: user.email,
+            name: user.name
+        }
+
+
+    return res.status(200).json({message: "logged In", user: resUser, token});
+
+  } catch (error) {
+
+    next(error)
+  };
+
+}
+
+module.exports = { loginUser, registerUser };
+
+
+
+
+connectDB.js;
+--------------
+const mongoose = require("mongoose");
+
+
+const connectDB = async () => {
+    try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log("MongoDB Connected Successfully");
+    
+} catch (error) {
+    console.error("DB connected Failed");
+    process.exit(1)
+}
+};
+module.exports = connectDB;
+
+
+
+errorhandler.js;
+-----------------
+const errorhandler = (err, req, res, next) => {
+    console.error(err.message);
+    console.error(err.stack || '');
+    const status = err.status ||500
+    res.status(status).json({error: err.message})
+    
+};
+module.exports = errorhandler
+
+
+
+logger.js;
+----------
+
+ //custom (error login function) middleware
+const logRequest = (req, res, next) => {
+
+    const timestamp = new Date().toISOString();
+    console.log(`${timestamp} - ${req.method} ${req.url} from ${req.ip}`);
+    next(); //Dont forget  
+}
+
+module.exports = logRequest;
+
+
+requireAuth.js;
+----------------
+const jwt = require ("jsonwebtoken");
+const UserModel = require('../models/user.model');
+
+const requireAuth = async(req, res, next)=> {
+const authHeader = req.header('Authorization');
+
+
+if(!authHeader || !authHeader.startsWith('Bearer'))
+    return res.status(401).json({error: 'Access denied - No token provided'});
+
+const token = authHeader.replace('Bearer', '');
+
+
+try {
+const payload = jwt.verify(token, process.env.JWT_SECRET);
+
+req.user = payload
+
+// To verify uf the user is still existing
+const user = await UserModel.findById(payload.userId);
+
+//To check if someone else is trying to use another persons token
+if(!user) {
+    res.status(404).json({message: "User not Found"});
+}
+
+req.user = user; //now every route knows who is logged in
+next();
+
+} catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+}
+
+}
+
+module.exports = requireAuth;
+
+
+
+
+articlemodel.js;
+-----------------
+
+const mongoose = require("mongoose");
+
+const commentSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    text: {
+      type: String,
+      required: true,
+      minLength: 3,
+    },
+  },
+  { timestamps: true }
+);
+
+const articleSchema = new mongoose.Schema(
+  {
+    header: {
+      type: String,
+      required: true,
+      minLength: 5,
+    },
+    subHeader: {
+      type: String,
+      minLength: 5,
+    },
+    title: {
+      type: String,
+      required: true,
+      minLength: 5,
+    },
+    content: {
+      type: String,
+      required: true,
+      minLength: 20,
+    },
+
+    // store the ID of the user
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+       ref: "User",
+       required : true
+    },
+    comments: [commentSchema],
+  },
+  { timestamps: true }
+);
+
+// Text index for search
+articleSchema.index({
+  header: "text",
+  subHeader: "text",
+  title: "text",
+  content: "text",
+  author: "text",
+});
+
+const Article = mongoose.model("Article", articleSchema);
+module.exports = Article;
+
+
+
+usermodel.js;
+----------------
+const mongoose = require ("mongoose")
+const userSchema = mongoose.Schema({
+
+    name :{
+        type : String ,
+        required : true
+    },
+
+    email :{
+        type : String ,
+        required : true,
+        unique : true
+    },
+
+    password :{
+        type : String ,
+        required : true,
+    },
+}, { timestamps: true}
+
+);
+
+const UserModel = mongoose.model ("User", userSchema);
+module.exports = UserModel;
+
+
+article.route.js;
+-----------------
+
+const express = require("express");
+const router = express.Router();
+const {
+  postArticle,
+  getAllArticles,
+  getArticleById,
+  updateArticleById,
+  deleteArticleById,
+  searchArticles,
+  requireAuth,
+} = require("../controllers/article.controller");
+
+const requireAuth = require("../middleware/requireAuth");
+const { validate } = require("../models/article.model");
+
+// Create article (requires authentication)
+router.post("/articles", requireAuth, postArticle);
+
+// Get all articles (public)
+router.get("/articles", getAllArticles);
+
+// Search articles
+router.get("/articles/search", requireAuth, searchArticles);
+
+// Get article by ID
+router.get("/articles/:id", requireAuth, getArticleById);
+
+// Update article (requires authentication)
+router.patch("/articles/:id", requireAuth, updateArticleById);
+
+// Delete article (requires authentication)
+router.delete("/articles/:id", requireAuth, deleteArticleById);
+
+module.exports = router;
+
+
+
+user.route.js;
+-------------------
+const express = require("express");
+const { registerUser, loginUser } = require("../controllers/user.controller");
+
+const router = express.Router();
+
+router.post("/sign-up", registerUser);
+router.post("/login", loginUser);
+
+module.exports = router;
+
+
+.env;
+---------
+node_module
+
+PORT = 3007
+
+MONGODB_URI = mongodb+srv://uchecyril_db_user:DbAifZdYBBQDIpt0@cluster0.o0kgle7.mongodb.net/?appName=Cluster0
+dbpassword = DbAifZdYBBQDIpt0
+
+JWT_SECRET = 8qAYl+OdbHNODTLpu0KV7iq34j3/k6RtbliLNZNVUuU
+
+
+.gitignore;
+------------
+.env
+
+
+blog.js;
+---------
+require('dotenv').config();
+const express = require("express");
+const app = express();
+const PORT = process.env.PORT;
+const cors = require('cors');
+const connectDB = require('./database/connectDB');
+const RequestLogger = require("./Middlewares/logger");
+const errorhandler = require("./Middlewares/errorhandler");
+const ArticleRoutes = require('./routes/article.route');
+const UserRoute = require("./routes/user.route")
+
+connectDB();
+
+// Middleware
+app.use(express.json());
+app.use(cors());
+app.use(RequestLogger);
+app.use("/api/users", UserRoute);
+
+// Routes
+app.use('/api', ArticleRoutes);
+
+// Error handler LAST
+app.use(errorhandler);
+
+app.listen(PORT, () => {
+  console.log(`server is listening on ${PORT}`);
+});
+
+
+package.json;
+--------------
+
+{
+  "name": "week9-blog-api",
+  "version": "1.0.0",
+  "main": "blog.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node blog.js",
+    "dev": "nodemon  blog.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "joi": "^18.1.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.4.1",
+    "nodemon": "^3.1.14"
+  }
+}
+
+
