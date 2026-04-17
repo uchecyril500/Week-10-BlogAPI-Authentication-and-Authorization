@@ -32,6 +32,11 @@ app.use("/api/users", UserRoute);
 // Article routes
 app.use("/api", ArticleRoutes);
 
+app.get("/", (req, res) => {
+  res.send("Blog API is running on Render...");
+});
+
+
 // Error handler LAST
 app.use(errorhandler);
 
