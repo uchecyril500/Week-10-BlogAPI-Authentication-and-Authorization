@@ -1,9 +1,13 @@
 --------------------Blog API – Authentication & Authorization--------------------
 
+
 This is a simple Blog API built with Node.js, Express, and MongoDB.
 It supports user registration, login, authentication, authorization, and article ownership.
 
+
+
 -------------------Features-------------------
+
 Users can sign up and log in.
 
 Passwords are hashed using bcrypt.
