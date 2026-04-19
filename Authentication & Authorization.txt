@@ -572,14 +572,6 @@ module.exports = router;
 ---------
 node_module
 
-PORT = *****
-
-MONGODB_URI = *****************************
-dbpassword = **********************************************
-
-JWT_SECRET = ********************
-
-
 .gitignore;
 ------------
 .env
