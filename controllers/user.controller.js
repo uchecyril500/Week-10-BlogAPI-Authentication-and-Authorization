@@ -1,18 +1,15 @@
-
-//Tregister + login, store password securely, return token
-
-
-// user.controller.js
-// Handles:
-// - User registration with hashed password (bcrypt)
-// - Login with email + password
-// - Returns JWT token on login
+// controllers/user.controller.js
+// Handles user registration and login with bcrypt + JWT.
+// Validates input using Joi and returns clean user objects.
 
 const UserModel = require("../models/user.model");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
+// =========================
+// REGISTER USER
+// =========================
 const registerUser = async (req, res, next) => {
   try {
     const registerSchema = Joi.object({
@@ -22,23 +19,27 @@ const registerUser = async (req, res, next) => {
     });
 
     const { error } = registerSchema.validate(req.body);
-    if (error)
+    if (error) {
       return res.status(400).json({ message: error.details[0].message });
+    }
 
     const { email, password, name } = req.body;
 
+    // Check if user already exists
     const existingUser = await UserModel.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
+    // Hash password
     const salt = await bcrypt.genSalt(12);
-    const hashed = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Create user
     const user = new UserModel({
-      email,
-      password: hashed,
       name,
+      email,
+      password: hashedPassword,
     });
 
     await user.save();
@@ -51,6 +52,9 @@ const registerUser = async (req, res, next) => {
   }
 };
 
+// =========================
+// LOGIN USER
+// =========================
 const loginUser = async (req, res, next) => {
   const loginSchema = Joi.object({
     email: Joi.string().email().required(),
@@ -58,19 +62,26 @@ const loginUser = async (req, res, next) => {
   });
 
   const { error } = loginSchema.validate(req.body);
-  if (error)
+  if (error) {
     return res.status(400).json({ message: error.details[0].message });
+  }
 
   try {
     const { email, password } = req.body;
 
+    // Check if user exists
     const user = await UserModel.findOne({ email });
-    if (!user)
+    if (!user) {
       return res.status(400).json({ message: "User does not exist" });
+    }
 
+    // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) throw new Error("Invalid credentials");
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
+    // Create JWT token
     const token = jwt.sign(
       { userId: user._id, name: user.name },
       process.env.JWT_SECRET,
@@ -83,10 +94,14 @@ const loginUser = async (req, res, next) => {
       name: user.name,
     };
 
-    return res.status(200).json({ message: "Logged in", user: resUser, token });
+    return res.status(200).json({
+      message: "Logged in",
+      user: resUser,
+      token,
+    });
   } catch (error) {
     next(error);
   }
 };
 
-module.exports = { loginUser, registerUser };
+module.exports = { registerUser, loginUser };

@@ -1,22 +1,23 @@
-//use req.user, protect ownership, no author in body
-
-
-// article.controller.js
-// Handles:
-// - Creating article: author comes from req.user (token), not from body
-// - Getting all articles (with author populated)
-// - Ownership checks on update/delete
-// - Search with text index
+// controllers/article.controller.js
+// Handles all article logic:
+// - Create article (author from logged-in user)
+// - Get all articles (with pagination + author populated)
+// - Get single article
+// - Update article (ownership enforced)
+// - Delete article (ownership enforced)
+// - Search articles by text index
 
 const Joi = require("joi");
 const ArticleModel = require("../models/article.model");
 
+// =========================
+// VALIDATION SCHEMAS
+// =========================
 const createArticleSchema = Joi.object({
   header: Joi.string().min(5).required(),
   subHeader: Joi.string().min(5).optional(),
   title: Joi.string().min(5).required(),
   content: Joi.string().min(20).required(),
-  // author is NOT accepted from body anymore
 });
 
 const updateArticleSchema = Joi.object({
@@ -26,13 +27,12 @@ const updateArticleSchema = Joi.object({
   content: Joi.string().min(20).optional(),
 }).min(1);
 
-// CREATE ARTICLE (requires auth, author from token)
+// =========================
+// CREATE ARTICLE
+// =========================
 const postArticle = async (req, res, next) => {
   const { error, value } = createArticleSchema.validate(req.body);
-
-  if (error) {
-    return res.status(400).json(error.details[0].message);
-  }
+  if (error) return res.status(400).json(error.details[0].message);
 
   try {
     const newArticle = new ArticleModel({
@@ -40,7 +40,7 @@ const postArticle = async (req, res, next) => {
       subHeader: value.subHeader,
       title: value.title,
       content: value.content,
-      author: req.user._id, // ownership: logged-in user
+      author: req.user._id, // logged-in user (ownership)
     });
 
     await newArticle.save();
@@ -54,7 +54,9 @@ const postArticle = async (req, res, next) => {
   }
 };
 
-// GET ALL ARTICLES (auth optional or required depending on route)
+// =========================
+// GET ALL ARTICLES (with pagination)
+// =========================
 const getAllArticle = async (req, res, next) => {
   let limit = Number(req.query.limit);
   let page = Number(req.query.page);
@@ -65,7 +67,7 @@ const getAllArticle = async (req, res, next) => {
   const skip = (page - 1) * limit;
 
   try {
-    const articles = await ArticleModel.find({})
+    const articles = await ArticleModel.find()
       .populate("author", "name email")
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -82,7 +84,9 @@ const getAllArticle = async (req, res, next) => {
   }
 };
 
+// =========================
 // GET ARTICLE BY ID
+// =========================
 const getArticleById = async (req, res, next) => {
   try {
     const article = await ArticleModel.findById(req.params.id).populate(
@@ -105,13 +109,12 @@ const getArticleById = async (req, res, next) => {
   }
 };
 
-// UPDATE ARTICLE BY ID (ownership check)
+// =========================
+// UPDATE ARTICLE BY ID (ownership)
+// =========================
 const updateArticleById = async (req, res, next) => {
   const { error, value } = updateArticleSchema.validate(req.body);
-
-  if (error) {
-    return res.status(400).json(error.details[0].message);
-  }
+  if (error) return res.status(400).json(error.details[0].message);
 
   try {
     const article = await ArticleModel.findById(req.params.id);
@@ -122,9 +125,11 @@ const updateArticleById = async (req, res, next) => {
       });
     }
 
-    // Ownership: only author can update
+    // Ownership check
     if (article.author.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not allowed to update this article" });
+      return res
+        .status(403)
+        .json({ message: "Not allowed to update this article" });
     }
 
     Object.assign(article, value);
@@ -139,7 +144,9 @@ const updateArticleById = async (req, res, next) => {
   }
 };
 
-// DELETE ARTICLE BY ID (ownership check)
+// =========================
+// DELETE ARTICLE BY ID (ownership)
+// =========================
 const deleteArticleById = async (req, res, next) => {
   try {
     const article = await ArticleModel.findById(req.params.id);
@@ -150,9 +157,11 @@ const deleteArticleById = async (req, res, next) => {
       });
     }
 
-    // Ownership: only author can delete
+    // Ownership check
     if (article.author.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not allowed to delete this article" });
+      return res
+        .status(403)
+        .json({ message: "Not allowed to delete this article" });
     }
 
     await article.deleteOne();
@@ -166,7 +175,9 @@ const deleteArticleById = async (req, res, next) => {
   }
 };
 
+// =========================
 // SEARCH ARTICLES BY KEYWORD
+// =========================
 const searchArticles = async (req, res, next) => {
   const { q } = req.query;
 
@@ -191,6 +202,9 @@ const searchArticles = async (req, res, next) => {
   }
 };
 
+// =========================
+// EXPORT CONTROLLER
+// =========================
 module.exports = {
   postArticle,
   getAllArticle,

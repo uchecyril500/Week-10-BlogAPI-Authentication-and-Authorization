@@ -638,3 +638,16 @@ package.json;
 }
 
 
+
+
+
+
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OWUyYjQ1MTI2N2ZmYmQ5MWM4MzIzYTciLCJuYW1lIjoiVWNoZWN5cmlsIiwiaWF0IjoxNzc2NDY1NzA2LCJleHAiOjE3NzcwNzA1MDZ9.jNe5tU_LyGEoDXOABH4t0p6gPU5jj69K2_LwBQKVFh4
+
+
+69e2b7e2d0ce9c2830bd3308
+
+
+Render url; https://week-10-blogapi-authentication-and.onrender.com/
+
+GitHub Repository link; https://github.com/uchecyril500/Week-10-BlogAPI-Authentication-and-Authorization

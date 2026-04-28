@@ -1,14 +1,7 @@
-//protect routes with requireAuth, fix imports
-
-
-// article.route.js
-// Routes for articles:
-// - POST /api/articles        (protected)
-// - GET  /api/articles        (public or protected – your choice)
-// - GET  /api/articles/search (protected here)
-// - GET  /api/articles/:id    (protected)
-// - PATCH /api/articles/:id   (protected + ownership in controller)
-// - DELETE /api/articles/:id  (protected + ownership in controller)
+// routes/article.route.js
+// Handles all article endpoints.
+// All routes are protected with requireAuth middleware.
+// Ownership checks are done inside the controller.
 
 const express = require("express");
 const router = express.Router();
@@ -24,10 +17,10 @@ const {
 
 const requireAuth = require("../Middlewares/requireAuth");
 
-// Create article (requires authentication)
+// Create article (protected)
 router.post("/articles", requireAuth, postArticle);
 
-// Get all articles (you can make this public or protected)
+// Get all articles (protected)
 router.get("/articles", requireAuth, getAllArticle);
 
 // Search articles (protected)
@@ -36,10 +29,10 @@ router.get("/articles/search", requireAuth, searchArticles);
 // Get article by ID (protected)
 router.get("/articles/:id", requireAuth, getArticleById);
 
-// Update article (protected + ownership in controller)
+// Update article (protected + ownership inside controller)
 router.patch("/articles/:id", requireAuth, updateArticleById);
 
-// Delete article (protected + ownership in controller)
+// Delete article (protected + ownership inside controller)
 router.delete("/articles/:id", requireAuth, deleteArticleById);
 
 module.exports = router;

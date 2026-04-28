@@ -1,15 +1,11 @@
-//link article to user (ownership)
-
-
-// article.model.js
-// Mongoose model for articles:
-// - header, subHeader, title, content
-// - author is a reference to User (ownership)
-// - comments embedded
-// - text index for search
+// models/article.model.js
+// Defines the Article schema with text search, comments, and author reference.
 
 const mongoose = require("mongoose");
 
+// =========================
+// COMMENT SUB-SCHEMA
+// =========================
 const commentSchema = new mongoose.Schema(
   {
     name: {
@@ -20,44 +16,52 @@ const commentSchema = new mongoose.Schema(
     text: {
       type: String,
       required: true,
-      minLength: 3,
+      minlength: 3,
     },
   },
   { timestamps: true }
 );
 
+// =========================
+// ARTICLE SCHEMA
+// =========================
 const articleSchema = new mongoose.Schema(
   {
     header: {
       type: String,
       required: true,
-      minLength: 5,
+      minlength: 5,
     },
     subHeader: {
       type: String,
-      minLength: 5,
+      minlength: 5,
     },
     title: {
       type: String,
       required: true,
-      minLength: 5,
+      minlength: 5,
     },
     content: {
       type: String,
       required: true,
-      minLength: 20,
+      minlength: 20,
     },
-    // Ownership: store the ID of the user who created the article
+
+    // Reference to User model (ownership)
     author: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+
     comments: [commentSchema],
   },
   { timestamps: true }
 );
 
+// =========================
+// TEXT INDEX FOR SEARCH
+// =========================
 articleSchema.index({
   header: "text",
   subHeader: "text",
@@ -65,5 +69,8 @@ articleSchema.index({
   content: "text",
 });
 
+// =========================
+// EXPORT MODEL
+// =========================
 const Article = mongoose.model("Article", articleSchema);
 module.exports = Article;
